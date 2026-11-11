@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Data-Driven Curriculum — демонстрационный прототип</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600&family=Unbounded:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* базовые стили */
+body{font-family:Onest,system-ui,sans-serif;background:#090c16;color:#e6e9f2;line-height:1.55}
+.disp{font-family:Unbounded,Onest,sans-serif;letter-spacing:-.02em}
+.fx{position:fixed;inset:0;z-index:-1;background:radial-gradient(640px circle at 12% 8%,rgba(139,124,255,.16),transparent 60%),radial-gradient(560px circle at 92% 85%,rgba(45,212,191,.11),transparent 60%)}
+.fx::after{content:"";position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.03) 1px,transparent 1px);background-size:56px 56px;mask-image:radial-gradient(ellipse at top,#000 20%,transparent 70%)}
+/* стили карточки */
+.card{position:relative;overflow:hidden;border-radius:22px;background:rgba(255,255,255,.028);border:1px solid rgba(255,255,255,.08);backdrop-filter:blur(14px);transition:border-color .3s}
+.card::before{content:"";position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .35s;background:radial-gradient(380px circle at var(--x,50%) var(--y,0),rgba(139,124,255,.16),transparent 62%)}
+.card:hover{border-color:rgba(255,255,255,.17)}
+.card:hover::before{opacity:1}
+.inp{display:block;width:100%;margin-top:4px;padding:7px 10px;border-radius:10px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);color:#fff}
+.inp[readonly]{opacity:.6}
+.inp:focus-visible{outline:2px solid #8b7cff;outline-offset:1px}
+#hrs table,#trs table{width:100%;min-width:520px}
+#hrs th,#hrs td,#trs th,#trs td{font-size:13px;padding:9px 12px}
+.seg{display:flex;gap:4px;padding:4px;border-radius:13px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08)}
+.seg button{padding:7px 15px;border-radius:10px;font-size:13px;color:#98a0b3;transition:all .25s}
+.seg button:hover{color:#fff}
+.seg button.on{background:rgba(255,255,255,.11);color:#fff;box-shadow:0 2px 14px rgba(0,0,0,.3)}
+.lbl{font-size:13px;color:#8d96aa}
+.val{font-family:Unbounded,sans-serif;font-size:34px;font-weight:500;margin-top:8px;letter-spacing:-.03em}
+.sub{font-size:12.5px;color:#8d96aa;margin-top:4px;min-height:19px}
+.bar{display:block;height:4px;margin-top:14px;border-radius:4px;background:rgba(255,255,255,.08);overflow:hidden}
+.bar b{display:block;height:100%;width:0;border-radius:4px;background:linear-gradient(90deg,#8b7cff,#2dd4bf);transition:width 1.1s cubic-bezier(.2,.7,.2,1),background .4s}
+.gt{background:linear-gradient(115deg,#fff 20%,#b4a9ff 60%,#5eead4);-webkit-background-clip:text;background-clip:text;color:transparent}
+/* стили таблицы */
+th{font-weight:500;font-size:13px;color:#8d96aa;text-align:left;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.08)}
+th small{display:block;font-weight:400;font-size:11.5px;line-height:1.35;margin-top:2px}
+.chip{white-space:nowrap}
+.how li{position:relative;padding-left:14px}
+.how li::before{content:"";position:absolute;left:0;top:.7em;width:5px;height:5px;border-radius:50%;background:#8b7cff}
+td{padding:14px;border-bottom:1px solid rgba(255,255,255,.05);font-size:14px;vertical-align:middle}
+.row{animation:in .5s both;transition:background .2s}
+.row:hover{background:rgba(255,255,255,.05)}
+@keyframes in{from{opacity:0;transform:translateX(-10px)}to{opacity:1;transform:none}}
+.chip{display:inline-block;font-size:12px;padding:3px 10px;border-radius:99px;border:1px solid}
+.c-r{color:#fda4af;background:rgba(251,113,133,.1);border-color:rgba(251,113,133,.3)}
+.c-o{color:#fdba74;background:rgba(251,146,60,.1);border-color:rgba(251,146,60,.3)}
+.c-y{color:#fde68a;background:rgba(250,204,21,.09);border-color:rgba(250,204,21,.28)}
+/* автоматические подсказки */
+.rec{animation:in .55s both;padding:14px 16px;margin-bottom:10px;border-radius:15px;background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.07);border-left:3px solid var(--c);transition:transform .25s,background .25s}
+.rec:hover{transform:translateX(4px);background:rgba(255,255,255,.06)}
+.sk{height:62px;margin-bottom:10px;border-radius:15px;background:linear-gradient(90deg,rgba(255,255,255,.04),rgba(255,255,255,.11),rgba(255,255,255,.04));background-size:200% 100%;animation:sh 1.1s infinite}
+@keyframes sh{to{background-position:-200% 0}}
+.spin{transition:transform .6s}
+.spin:hover{transform:rotate(180deg)}
+/* кнопка экспорта */
+.btn{position:relative;overflow:hidden;display:inline-flex;gap:10px;align-items:center;padding:15px 26px;border-radius:15px;font-weight:600;color:#0a0d18;background:linear-gradient(120deg,#c4b5fd,#5eead4);transition:transform .25s,box-shadow .3s}
+.btn::after{content:"";position:absolute;top:0;left:-60%;width:40%;height:100%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.65),transparent);transform:skewX(-20deg);transition:left .7s}
+.btn:hover{transform:translateY(-2px);box-shadow:0 14px 44px -10px rgba(139,124,255,.7)}
+.btn:hover::after{left:130%}
+.btn.busy{opacity:.7;pointer-events:none}
+#toast{position:fixed;right:24px;bottom:24px;z-index:50;padding:14px 20px;border-radius:14px;background:#141a2b;border:1px solid rgba(52,211,153,.4);color:#d1fae5;font-size:14px;transform:translateY(120px);opacity:0;transition:all .45s cubic-bezier(.2,.8,.2,1)}
+#toast.show{transform:none;opacity:1}
+:focus-visible{outline:2px solid #8b7cff;outline-offset:2px}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="fx"></div>
+
+<!-- шапка системы -->
+<header class="sticky top-0 z-20 border-b border-white/5 bg-[#090c16]/70 backdrop-blur-xl">
+  <div class="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-4 px-6 py-4">
+    <div class="flex items-center gap-3">
+      <div class="grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br from-violet-500 to-teal-400 shadow-lg shadow-violet-500/25">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0a0d18" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V9M10 19V5M16 19v-7M22 19H2"/></svg>
+      </div>
+      <div>
+        <h1 class="disp text-[16px] font-medium">Data-Driven Curriculum</h1>
+        <p class="text-xs text-zinc-400">Прототип системы анализа результатов тестирования по учебникам и темам</p>
+      </div>
+    </div>
+    <div class="flex flex-wrap items-center gap-3">
+      <span id="per" class="flex items-center gap-2 rounded-full border border-white/10 bg-white/[.03] px-3 py-1.5 text-xs text-zinc-300">Период: I четверть 2026/27</span>
+      <span class="chip c-y" id="demoChip" title="Числа и результаты в прототипе условные">Демонстрационные данные</span>
+      <div class="seg" data-k="cls" aria-label="Класс"><button class="on" data-v="10">10 класс</button><button data-v="11">11 класс</button></div>
+      <div class="seg" data-k="sub" aria-label="Предмет"><button class="on" data-v="Алгебра">Алгебра</button><button data-v="Геометрия">Геометрия</button></div>
+    </div>
+  </div>
+</header>
+
+<main class="mx-auto max-w-7xl px-6 pb-16">
+  <section class="pt-12 pb-2">
+    <p class="text-sm text-violet-300/80" id="ctx"></p>
+    <h2 class="disp gt mt-3 max-w-4xl text-3xl font-medium leading-tight md:text-5xl">Решения по учебникам и часам — на основе данных тестирования</h2>
+    <p class="mt-5 max-w-2xl text-zinc-400">Прототип показывает результаты тестирования по темам, выделяет темы ниже порога, описательно сравнивает учебники и предлагает методисту варианты перераспределения учебных часов.</p>
+  </section>
+
+  <!-- пометка о демонстрационных данных -->
+  <section class="mt-8 flex items-start gap-3 rounded-2xl border border-amber-300/25 bg-amber-300/[.06] px-4 py-3" role="note" id="demoNote" aria-label="Демонстрационные данные">
+    <svg class="mt-0.5 shrink-0 text-amber-200" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.01"/></svg>
+    <p class="text-[13px] leading-relaxed text-amber-100/90">Числа учеников, количество школ и результаты тестов в прототипе условные и не являются подтверждённой статистикой. Названия учебников использованы как метки для демонстрации: приведённые результаты не отражают реальные результаты школ или учебников.</p>
+  </section>
+
+  <!-- ключевые метрики -->
+  <section class="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <div class="card p-5"><p class="lbl">Средний результат по группам</p><p class="val" id="m1">0</p><p class="sub" id="m1s"></p><i class="bar"><b id="b1"></b></i></div>
+    <div class="card p-5"><p class="lbl">Участники сравнения</p><p class="val" id="m2">0</p><p class="sub" id="m2s"></p><i class="bar"><b id="b2"></b></i></div>
+    <div class="card p-5"><p class="lbl">Сводный индекс результатов</p><p class="val" id="m3">0</p><p class="sub" id="m3s"></p><i class="bar"><b id="b3"></b></i></div>
+    <div class="card p-5"><p class="lbl">Тем ниже порога <span data-thr>65</span>%</p><p class="val" id="m4">0</p><p class="sub" id="m4s"></p><i class="bar"><b id="b4"></b></i></div>
+  </section>
+
+    <!-- данные и настройки методики -->
+  <section class="card mt-4 p-6" aria-labelledby="sth">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <h3 id="sth" class="disp text-lg font-medium">Данные и настройки методики</h3>
+      <span class="chip c-y" id="dstate">Демонстрационные данные</span>
+    </div>
+    <div class="mt-4 grid gap-6 lg:grid-cols-2">
+      <div>
+        <p class="text-sm text-zinc-400">Загрузите свои результаты в CSV или Excel (.xlsx). Файл проверяется; при ошибке он не принимается, текущие данные не меняются.</p>
+        <div class="mt-3 flex flex-wrap items-center gap-2">
+          <input id="imp" type="file" accept=".csv,.txt,.xlsx" aria-label="Загрузить файл CSV или Excel" class="max-w-full text-sm text-zinc-300 file:mr-3 file:cursor-pointer file:rounded-xl file:border file:border-white/15 file:bg-white/5 file:px-4 file:py-2 file:text-zinc-200">
+          <button type="button" id="tpl" class="rounded-xl border border-white/15 px-3 py-2 text-[13px] text-zinc-200 hover:bg-white/5">Скачать шаблон CSV</button>
+          <button type="button" id="demo-back" class="rounded-xl border border-white/15 px-3 py-2 text-[13px] text-zinc-200 hover:bg-white/5">Вернуть демо-данные</button>
+        </div>
+        <p id="imsg" role="status" aria-live="polite" class="mt-2 text-[13px] text-zinc-400"></p>
+        <p class="mt-2 text-[12.5px] text-zinc-400">Колонки: class, subject, textbook, topic, score (0–100), students, hours. Необязательные: period (для динамики, нужно ≥ 2 периодов), students_below (фактическое число учеников ниже порога).</p>
+      </div>
+      <fieldset class="grid grid-cols-2 content-start gap-3 text-[13px] text-zinc-300 sm:grid-cols-3">
+        <legend class="sr-only">Настройки методики</legend>
+        <label>Порог освоения, %<input class="inp" id="c-thr" type="number" min="30" max="95" step="1" value="65"></label>
+        <label>Вес среднего балла, %<input class="inp" id="c-wa" type="number" min="0" max="100" step="1" value="70"></label>
+        <label>Вес доли тем ≥ порога, %<input class="inp" id="c-ws" type="number" value="30" readonly aria-readonly="true"></label>
+        <label>Мин. часов на тему, % от плана<input class="inp" id="c-min" type="number" min="30" max="100" step="1" value="80"></label>
+        <label>Макс. часов на тему, % от плана<input class="inp" id="c-max" type="number" min="100" max="300" step="1" value="130"></label>
+        <label>Запас донора, п.п. над порогом<input class="inp" id="c-mar" type="number" min="0" max="30" step="1" value="5"></label>
+        <button type="button" id="c-rst" class="col-span-2 rounded-xl border border-white/15 px-3 py-2 text-[13px] text-zinc-200 hover:bg-white/5 sm:col-span-3">Сбросить настройки</button>
+      </fieldset>
+    </div>
+    <details class="mt-4"><summary class="cursor-pointer text-sm font-medium text-zinc-200">Методика и ограничения</summary><ul class="how mt-3 space-y-2 text-[13px] text-zinc-400" id="meth"></ul></details>
+  </section>
+
+  <!-- график сравнения -->
+  <section class="card mt-4 p-6">
+    <div class="flex flex-wrap items-start justify-between gap-4">
+      <div>
+        <h3 class="disp text-lg font-medium">Усвоение тем по учебникам</h3>
+        <p class="mt-1 text-sm text-zinc-400">Красная рамка у столбца означает результат ниже порога прототипа. Нажмите на легенду, чтобы скрыть серию.</p>
+        <p class="mt-2 max-w-3xl text-[13px] text-zinc-400"><b class="font-medium text-zinc-300">Сравнение описательное.</b> На результаты могут влиять состав классов, учитель и сложность теста, поэтому сравнение само по себе не доказывает, что разницу вызвал учебник.</p>
+      </div>
+      <div class="seg" data-k="mode" aria-label="Вид графика"><button class="on" data-v="bar">Столбцы</button><button data-v="radar">Радар</button></div>
+    </div>
+    <div class="relative mt-6 h-[400px]"><canvas id="chart"></canvas></div>
+  </section>
+
+  <!-- как читать результаты -->
+  <section class="card mt-4 px-6 py-4">
+    <details open>
+      <summary class="cursor-pointer text-sm font-medium text-zinc-200">Как читать результаты</summary>
+      <ul class="how mt-3 grid gap-x-8 gap-y-2 text-[13px] text-zinc-400 md:grid-cols-2">
+        <li><b class="font-medium text-zinc-300">Порог <span data-thr>65</span>%</b> — настройка демонстрационного прототипа, а не официальный норматив.</li>
+        <li><b class="font-medium text-zinc-300">Участники сравнения</b> — сумма по группам учебников; ученики и школы могут повторяться в нескольких группах.</li>
+        <li><b class="font-medium text-zinc-300">Средний результат по группам</b> — среднее по темам в %, взвешенное по числу учеников в группах учебников. При пересечении групп один ученик может учитываться несколько раз.</li>
+        <li><b class="font-medium text-zinc-300">Сводный индекс результатов</b> — <span data-wa>70</span>% среднего результата по темам плюс <span data-ws>30</span>% доли тем не ниже порога. Веса настраиваются (по умолчанию условные); индекс нужен только для описательного сравнения внутри демо и не измеряет эффективность учебника. В карточке показано наибольшее значение среди учебников.</li>
+        <li><b class="font-medium text-zinc-300">Оценка по демонстрационной модели</b> — число учеников × (100% − результат). Это ориентир, а не число учеников, не усвоивших тему.</li>
+        <li><b class="font-medium text-zinc-300">Статус</b> — условная градация отставания от порога: от 8 п.п. — сильное, от 4 п.п. — заметное, меньше 4 п.п. — небольшое.</li>
+      </ul>
+    </details>
+  </section>
+
+  <div class="mt-4 grid gap-4 lg:grid-cols-5">
+    <!-- таблица проблем -->
+    <section class="card p-6 lg:col-span-3">
+      <div class="flex items-center justify-between">
+        <h3 class="disp text-lg font-medium">Проблемные разделы</h3>
+        <span class="chip c-r" id="pc">0</span>
+      </div>
+      <p class="mt-1 text-sm text-zinc-400">Усвоение ниже порога прототипа (<span data-thr>65</span>%, не официальный норматив); отставание — разница с порогом.</p>
+      <div class="mt-4 overflow-x-auto">
+        <table class="w-full min-w-[760px]">
+          <thead><tr><th>Учебник</th><th>Тема</th><th>Усвоение</th><th>Отставание</th><th id="thaff" class="min-w-[170px]"></th><th>Статус</th></tr></thead>
+          <tbody id="tb"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- автоматические подсказки -->
+    <section class="card p-6 lg:col-span-2">
+      <div class="flex items-center justify-between">
+        <h3 class="disp text-lg font-medium">Автоматические подсказки</h3>
+        <button id="re" class="spin grid h-9 w-9 place-items-center rounded-xl border border-white/10 text-zinc-300 hover:text-white" aria-label="Пересчитать подсказки">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8M21 3v5h-5"/></svg>
+        </button>
+      </div>
+      <p class="mt-1 text-sm text-zinc-400">Рассчитаны по заданным правилам, не языковой моделью. Строятся по темам ниже порога <span data-thr>65</span>% и сравнению учебников. Это варианты для рассмотрения, а не решения.</p>
+      <div class="mt-4" id="ai"></div>
+      <p class="mt-4 rounded-xl border border-white/10 bg-white/[.03] px-3 py-2 text-[13px] text-zinc-300">Окончательное решение по часам и выбору учебника принимает методист.</p>
+    </section>
+  </div>
+
+    <!-- перераспределение часов -->
+  <section class="card mt-4 p-6" aria-labelledby="hh">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <h3 id="hh" class="disp text-lg font-medium">Перераспределение часов: исходный план и вариант</h3>
+      <span class="chip c-y" id="hchk"></span>
+    </div>
+    <p class="mt-1 text-sm text-zinc-400" id="hnote"></p>
+    <div class="mt-4 overflow-x-auto" id="hrs"></div>
+  </section>
+
+  <!-- динамика -->
+  <section class="card mt-4 p-6" aria-labelledby="dh">
+    <h3 id="dh" class="disp text-lg font-medium">Динамика по периодам</h3>
+    <div class="relative mt-4 h-[280px]" id="tcw" hidden><canvas id="tchart" role="img" aria-label="Средний результат по периодам"></canvas></div>
+    <div class="mt-4 overflow-x-auto text-[13px] text-zinc-400" id="trs"></div>
+  </section>
+
+  <!-- блок экспорта -->
+  <section class="card mt-4 flex flex-col items-start justify-between gap-6 p-8 md:flex-row md:items-center">
+    <div>
+      <h3 class="disp text-xl font-medium">Отчёт для обсуждения</h3>
+      <p class="mt-2 max-w-xl text-sm text-zinc-400">В отчёт войдут результаты по темам, проблемные разделы и автоматические подсказки по часам для выбранного класса и предмета, а также пометка об источнике данных (демонстрационные или из файла). Отчёт не является официальным документом.</p>
+    </div>
+    <button class="btn" id="exp">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M4 21h16"/></svg>
+      <span>Экспортировать отчёт</span>
+    </button>
+  </section>
+</main>
+
+<footer class="border-t border-white/5 py-8">
+  <p class="mx-auto max-w-7xl px-6 text-sm text-zinc-500">Прототип показывает, как результаты тестирования по темам могут помогать методисту обсуждать выбор учебников и распределение часов. Все цифры на странице демонстрационные; решения принимает методист.</p>
+</footer>
+<div id="toast" role="status"></div>
+
+<script>
+// данные тестирования
+let THR = 65, WA = 70, MINP = 80, MAXP = 130, MARGIN = 5;
+const BC = { "Атамұра": "#8b7cff", "Мектеп": "#2dd4bf" };
+let DB = {
+  "10|Алгебра": {
+    topics: ["Тригонометрические функции", "Показательные и логарифмические уравнения", "Производная и её физический смысл", "Элементы теории вероятностей"],
+    hours: [16, 14, 18, 10],
+    books: {
+      "Атамұра": { author: "Шыныбеков", score: [72, 69, 61, 78], students: 1640, schools: 18 },
+      "Мектеп": { author: "Абылкасымова", score: [64, 54, 66, 71], students: 1200, schools: 14 }
+    }
+  },
+  "10|Геометрия": {
+    topics: ["Аксиомы стереометрии", "Параллельность в пространстве", "Перпендикулярность в пространстве", "Многогранники"],
+    hours: [10, 14, 16, 18],
+    books: {
+      "Атамұра": { author: "Шыныбеков", score: [76, 70, 63, 66], students: 1580, schools: 17 },
+      "Мектеп": { author: "Абылкасымова", score: [71, 62, 59, 68], students: 1190, schools: 14 }
+    }
+  },
+  "11|Алгебра": {
+    topics: ["Первообразная и интеграл", "Комбинаторика и бином Ньютона", "Комплексные числа", "Задачи с параметрами"],
+    hours: [18, 12, 10, 14],
+    books: {
+      "Атамұра": { author: "Шыныбеков", score: [67, 73, 58, 52], students: 1420, schools: 16 },
+      "Мектеп": { author: "Абылкасымова", score: [70, 68, 61, 49], students: 1090, schools: 13 }
+    }
+  },
+  "11|Геометрия": {
+    topics: ["Векторы в пространстве", "Метод координат", "Тела вращения", "Объёмы тел"],
+    hours: [12, 14, 16, 18],
+    books: {
+      "Атамұра": { author: "Шыныбеков", score: [74, 66, 71, 63], students: 1390, schools: 16 },
+      "Мектеп": { author: "Абылкасымова", score: [69, 60, 73, 67], students: 1050, schools: 12 }
+    }
+  }
+};
+
+const DEMO = DB; let SRC = { demo: true, name: "" };
+let cls = "10", sub = "Алгебра", mode = "bar", chart = null;
+const $ = s => document.querySelector(s);
+const cur = () => DB[cls + "|" + sub];
+const avg = a => a.reduce((x, y) => x + y, 0) / a.length;
+
+const sev = g => g >= 8 ? ["Сильное отставание", "c-r"] : g >= 4 ? ["Заметное отставание", "c-o"] : ["Небольшое отставание", "c-y"];
+const fmt = n => n.toLocaleString("ru-RU");
+
+// счетчик чисел
+function count(el, to, dec = 0, suf = "") {
+  const from = parseFloat(el.dataset.v || 0), t0 = performance.now();
+  el.dataset.v = to;
+  const step = t => {
+    const k = Math.min((t - t0) / 1000, 1), e = 1 - Math.pow(1 - k, 3);
+    el.textContent = (from + (to - from) * e).toLocaleString("ru-RU", { minimumFractionDigits: dec, maximumFractionDigits: dec }) + suf;
+    if (k < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+
+function renderMetrics(d) {
+  const s = stats(d), n = Object.keys(s).sort((a, b) => s[b].idx - s[a].idx);
+  const tot = n.reduce((a, k) => a + s[k].students, 0), sch = n.reduce((a, k) => a + s[k].schools, 0);
+  const w = n.reduce((a, k) => a + s[k].avg * s[k].students, 0) / tot;
+  const p = problems(d);
+  const pairs = d.topics.length * Object.keys(d.books).length;
+  count($("#m1"), w, 1, "%");
+  count($("#m2"), tot);
+  count($("#m3"), s[n[0]].idx);
+  count($("#m4"), p.length);
+  $("#m1s").textContent = n.map(k => k + " " + s[k].avg.toFixed(1) + "%").join(", ");
+  $("#m2s").textContent = (sch ? sch + " школ · " : "") + "сумма по " + n.length + " группам; ученики и школы могут повторяться";
+  $("#m3s").textContent = n.map(k => k + " " + s[k].idx).join(", ");
+  $("#m4s").textContent = p.length ? "из " + pairs + " пар «учебник и тема»" : "тем ниже порога нет";
+  $("#b1").style.width = w + "%";
+  $("#b2").style.width = "100%";
+  $("#b3").style.width = s[n[0]].idx + "%";
+  $("#b4").style.width = (pairs ? p.length / pairs * 100 : 0) + "%";
+  $("#b4").style.background = "#fb7185";
+}
+
+// инициализация графика
+const wrap = s => {
+  const l = [""];
+  s.split(" ").forEach(x => {
+    const t = (l[l.length - 1] + " " + x).trim();
+    if (t.length > 18) l.push(x); else l[l.length - 1] = t;
+  });
+  return l;
+};
+function draw() {
+  const d = cur(), ks = Object.keys(d.books), rd = mode === "radar", grid = "rgba(255,255,255,.07)";
+  if (chart) chart.destroy();
+  Chart.defaults.font.family = "Onest, sans-serif";
+  const ds = ks.map(k => ({
+    label: k,
+    data: d.books[k].score,
+    backgroundColor: rd ? BC[k] + "33" : BC[k] + "cc",
+    borderColor: rd ? BC[k] : d.books[k].score.map(v => v < THR ? "#fb7185" : BC[k]),
+    borderWidth: 2,
+    borderRadius: 10,
+    pointBackgroundColor: BC[k],
+    hoverBackgroundColor: BC[k]
+  }));
+  ds.push({ label: "Порог прототипа " + THR + "%", data: d.topics.map(() => THR), type: rd ? "radar" : "line", borderColor: "#fb7185", borderDash: [6, 6], borderWidth: 1.5, pointRadius: 0, backgroundColor: "transparent", fill: false });
+  const sc = rd
+    ? { r: { min: 0, max: 100, ticks: { stepSize: 25, color: "#6b7385", backdropColor: "transparent" }, grid: { color: grid }, angleLines: { color: grid }, pointLabels: { color: "#cbd2e1", font: { size: 12 } } } }
+    : { x: { grid: { display: false }, ticks: { color: "#cbd2e1" } }, y: { min: 0, max: 100, grid: { color: grid }, ticks: { color: "#8d96aa", callback: v => v + "%" } } };
+  chart = new Chart($("#chart"), {
+    type: mode,
+    data: { labels: d.topics.map(wrap), datasets: ds },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      animation: { duration: 1000, easing: "easeOutQuart" },
+      interaction: { mode: "index", intersect: false },
+      scales: sc,
+      plugins: {
+        legend: { labels: { color: "#cbd2e1", usePointStyle: true, boxWidth: 8, padding: 18 } },
+        tooltip: {
+          backgroundColor: "#121828", borderColor: "rgba(255,255,255,.12)", borderWidth: 1, padding: 12, titleFont: { weight: "600" },
+          callbacks: { title: c => d.topics[c[0].dataIndex], label: c => " " + c.dataset.label + ": " + (c.parsed.y ?? c.parsed.r) + "%" }
+        }
+      }
+    }
+  });
+}
+
+function renderAI(d) {
+  const box = $("#ai");
+  box.innerHTML = '<div class="sk"></div><div class="sk"></div><div class="sk"></div>';
+  setTimeout(() => {
+    box.innerHTML = recs(d).map((r, i) => `<div class="rec" style="--c:${r.c};animation-delay:${i * 120}ms">
+      <div class="flex items-start justify-between gap-3"><p class="text-[14.5px] font-medium leading-snug">${r.h}</p><span class="chip shrink-0 border-white/15 text-zinc-300">${r.t}</span></div>
+      <p class="mt-2 text-[13px] text-zinc-400">${r.x}</p></div>`).join("");
+  }, 300);
+}
+
+// экспорт отчета
+function toast(t) {
+  const el = $("#toast");
+  el.textContent = t; el.classList.add("show");
+  setTimeout(() => el.classList.remove("show"), 3200);
+}
+// ===== методика: настройки (по умолчанию — прежние значения прототипа) =====
+const CFG0 = { thr: 65, wa: 70, minp: 80, maxp: 130, margin: 5 };
+const PALETTE = ["#8b7cff", "#2dd4bf", "#fbbf24", "#38bdf8"];
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+const sg = n => (n > 0 ? "+" : n < 0 ? "−" : "") + Math.abs(n);
+
+function stats(d) {
+  const o = {};
+  for (const [n, b] of Object.entries(d.books)) {
+    const av = avg(b.score), ok = b.score.filter(v => v >= THR).length / b.score.length * 100;
+    o[n] = { avg: av, idx: Math.round(av * WA / 100 + ok * (100 - WA) / 100), students: b.students, schools: b.schools };
+  }
+  return o;
+}
+// число учеников: факт из файла (students_below), иначе только оценка по среднему баллу
+function problems(d) {
+  const r = [];
+  for (const [n, b] of Object.entries(d.books)) b.score.forEach((v, i) => {
+    if (v >= THR) return;
+    const act = !!b.below && b.below[i] != null, ns = b.sts ? b.sts[i] : b.students;
+    r.push({ book: n, topic: d.topics[i], score: v, gap: +(THR - v).toFixed(1), act, aff: act ? b.below[i] : Math.round(ns * (100 - v) / 100) });
+  });
+  return r.sort((a, b) => b.gap - a.gap);
+}
+
+// ===== часы: общий объём сохраняется =====
+// целочисленное распределение total по весам w с потолками cap (метод наибольших остатков)
+function share(total, w, cap) {
+  const r = w.map(() => 0); let left = total;
+  while (left > 0) {
+    const act = w.map((x, i) => x > 0 && r[i] < cap[i] ? i : -1).filter(i => i >= 0);
+    if (!act.length) break;
+    const W = act.reduce((a, i) => a + w[i], 0), q = act.map(i => ({ i, f: left * w[i] / W }));
+    let given = 0;
+    q.forEach(e => { const g = Math.min(Math.floor(e.f), cap[e.i] - r[e.i]); r[e.i] += g; given += g; e.rem = e.f - Math.floor(e.f); });
+    left -= given;
+    if (!given) { q.sort((a, b) => b.rem - a.rem || w[b.i] - w[a.i]); for (const e of q) { if (left <= 0) break; if (r[e.i] < cap[e.i]) { r[e.i]++; left--; } } }
+  }
+  return r;
+}
+function plan(d, k) {
+  const sc = d.books[k].score, o = d.hours.slice();
+  const lo = o.map(h => h ? Math.min(h, Math.max(1, Math.ceil(h * MINP / 100))) : 0), hi = o.map(h => Math.max(h, Math.floor(h * MAXP / 100)));
+  const need = sc.map(v => v < THR ? THR - v : 0);                      // получатели: только темы ниже порога
+  const sur = sc.map(v => v >= THR + MARGIN ? v - THR : 0);             // доноры: только темы с запасом над порогом
+  const room = need.map((n, i) => n > 0 ? hi[i] - o[i] : 0), cap = sur.map((s, i) => s > 0 ? o[i] - lo[i] : 0);
+  const X = Math.min(room.reduce((a, b) => a + b, 0), cap.reduce((a, b) => a + b, 0));
+  const recv = X ? share(X, need, room) : o.map(() => 0), give = X ? share(X, sur, cap) : o.map(() => 0);
+  const opt = o.map((h, i) => h + recv[i] - give[i]);
+  const noDonor = need.some(n => n > 0) && !cap.some(c => c > 0), noRoom = need.some(n => n > 0) && !room.some(r => r > 0);
+  return { k, orig: o, opt, recv, give, moved: X, lo, hi, noDonor, noRoom, ok: opt.reduce((a, b) => a + b, 0) === o.reduce((a, b) => a + b, 0) && opt.every((h, i) => h >= lo[i] && h <= hi[i]) };
+}
+const sum = a => a.reduce((x, y) => x + y, 0);
+function hoursTable(d) {
+  const ks = Object.keys(d.books), P = ks.map(k => plan(d, k)), T = sum(d.hours);
+  return "<table><tr><th>Тема</th><th>По плану, ч</th>" + ks.map(k => "<th>" + k + ": вариант, ч</th>").join("") + "</tr>" +
+    d.topics.map((t, i) => "<tr><td>" + t + "</td><td>" + d.hours[i] + "</td>" + P.map(p => "<td><b>" + p.opt[i] + "</b> (" + (p.opt[i] === p.orig[i] ? "без изменений" : sg(p.opt[i] - p.orig[i])) + ")</td>").join("") + "</tr>").join("") +
+    "<tr><td><b>Итого</b></td><td><b>" + T + "</b></td>" + P.map(p => "<td><b>" + sum(p.opt) + "</b> " + (p.ok ? "✓ объём сохранён" : "⚠ нарушено ограничение") + "</td>").join("") + "</tr></table>";
+}
+const hoursNote = () => "Вариант для рассмотрения. Общий объём часов сохраняется. Часы получают темы ниже порога " + THR + "% (пропорционально отставанию), отдают темы с результатом не ниже " + (THR + MARGIN) + "% (пропорционально запасу). Каждая тема остаётся в пределах " + MINP + "–" + MAXP + "% исходных часов, не менее 1 ч. Это правило, а не расчёт эффекта: влияние на результаты не прогнозируется.";
+
+// ===== динамика (только если в данных ≥ 2 периодов) =====
+function trend(d) {
+  const ks = Object.keys(d.books), h0 = d.books[ks[0]].hist;
+  if (!h0 || h0.length < 2) return null;
+  return { ps: h0.map(x => x.p), by: ks.map(k => { const h = d.books[k].hist; return { k, avg: h.map(x => +avg(x.score).toFixed(1)), d: d.topics.map((_, i) => +(h[h.length - 1].score[i] - h[0].score[i]).toFixed(1)) }; }) };
+}
+function trendHTML(d) {
+  const t = trend(d);
+  if (!t) return "<p>Динамика недоступна: в данных один период. Загрузите файл с колонкой period минимум за два периода.</p>";
+  const L = t.ps[t.ps.length - 1];
+  return "<table><tr><th>Тема</th>" + t.by.map(b => "<th>" + b.k + ": " + t.ps[0] + " → " + L + ", п.п.</th>").join("") + "</tr>" +
+    d.topics.map((tp, i) => "<tr><td>" + tp + "</td>" + t.by.map(b => "<td>" + sg(b.d[i]) + "</td>").join("") + "</tr>").join("") +
+    "<tr><td><b>Средний результат по периодам</b></td>" + t.by.map(b => "<td>" + t.ps.map((p, i) => p + ": " + b.avg[i] + "%").join("; ") + "</td>").join("") + "</tr></table>" +
+    "<p>Изменения описательные: они показывают, что произошло, но не объясняют почему (учитель, состав классов, сложность теста).</p>";
+}
+let tch = null;
+function drawTrend(d) {
+  const t = trend(d), w = $("#tcw");
+  if (tch) { tch.destroy(); tch = null; }
+  w.hidden = !t;
+  if (!t) return;
+  tch = new Chart($("#tchart"), { type: "line", data: { labels: t.ps, datasets: t.by.map(b => ({ label: b.k, data: b.avg, borderColor: BC[b.k], backgroundColor: BC[b.k], tension: .25 })) },
+    options: { responsive: true, maintainAspectRatio: false, scales: { y: { min: 0, max: 100, grid: { color: "rgba(255,255,255,.07)" }, ticks: { color: "#8d96aa", callback: v => v + "%" } }, x: { grid: { display: false }, ticks: { color: "#cbd2e1" } } }, plugins: { legend: { labels: { color: "#cbd2e1" } } } } });
+}
+
+// ===== методика: единый текст для интерфейса и отчёта =====
+const method = () => [
+  "<b>Сводный индекс результатов</b> = " + WA + "% × средний результат по темам + " + (100 - WA) + "% × доля тем не ниже порога " + THR + "%. Веса (в сумме 100%) и порог настраиваются; по умолчанию 70/30 и 65% — условные значения прототипа, не нормативы. Индекс не измеряет эффективность учебника.",
+  "<b>Сравнение учебников описательное:</b> на результаты влияют состав классов, учитель и сложность теста, поэтому сравнение не доказывает, что разницу вызвал учебник.",
+  "<b>Часы:</b> " + hoursNote(),
+  "<b>Число учеников:</b> если в файле есть колонка students_below, показан факт из файла (по критерию источника); иначе — оценка «учеников × (100% − средний результат по теме)», это не число не усвоивших тему.",
+  "<b>Динамика</b> строится только при ≥ 2 периодов в файле и не объясняет причин изменений."
+].map(x => "<li>" + x + "</li>").join("");
+
+// ===== рекомендации: проблема, данные, действие, ограничения =====
+function recs(d) {
+  const s = stats(d), out = [], ks = Object.keys(d.books), P = {};
+  ks.forEach(k => P[k] = plan(d, k));
+  const items = [];
+  ks.forEach(k => P[k].recv.forEach((x, i) => { if (x > 0) items.push({ k, i, x, gap: THR - d.books[k].score[i] }); }));
+  items.sort((a, b) => b.gap - a.gap).slice(0, 3).forEach(it => {
+    const p = P[it.k], b = d.books[it.k], pr = problems(d).find(r => r.book === it.k && r.topic === d.topics[it.i]);
+    const src = d.topics.map((t, j) => p.give[j] ? "«" + t + "» −" + p.give[j] + " ч (" + b.score[j] + "%)" : "").filter(Boolean).join(", ");
+    out.push({ t: "+" + it.x + " ч", c: BC[it.k], h: "Рассмотреть +" + it.x + " ч на тему «" + d.topics[it.i] + "» для программы " + it.k,
+      x: "<b>Проблема:</b> результат " + b.score[it.i] + "% ниже порога " + THR + "% (отставание " + it.gap.toFixed(1).replace(".0", "") + " п.п.).<br>" +
+        "<b>Данные:</b> " + (pr.act ? pr.aff + " учеников ниже порога (по данным файла)" : "≈ " + pr.aff + " учеников — оценка по среднему баллу, не факт") + ".<br>" +
+        "<b>Вариант:</b> с " + p.orig[it.i] + " до " + p.opt[it.i] + " ч; источники часов этого учебника: " + src + ".<br>" +
+        "<b>Ограничения:</b> перенос пропорционален отставанию, прирост баллов не прогнозируется; причины низкого результата неизвестны." });
+  });
+  ks.forEach(k => {
+    const un = d.topics.map((t, i) => d.books[k].score[i] < THR && !P[k].recv[i] ? "«" + t + "» (" + d.books[k].score[i] + "%)" : "").filter(Boolean);
+    if (un.length) out.push({ t: P[k].moved ? "Предел" : "Нужен выбор", c: BC[k], h: P[k].moved ? "Часть тем ниже порога не получила часов (программа " + k + ")" : "Для программы " + k + " часы внутри плана перераспределить не удаётся",
+      x: "<b>Проблема:</b> без добавления часов остались " + un.join(", ") + ".<br><b>Данные:</b> " + (P[k].noDonor ? "нет тем с результатом не ниже " + (THR + MARGIN) + "% и запасом часов" : "исчерпаны часы тем-доноров (не ниже " + (THR + MARGIN) + "% и не меньше " + MINP + "% плана) или достигнут предел " + MAXP + "% исходных часов") + ".<br><b>Вариант:</b> изменить ограничения или общий объём часов.<br><b>Ограничения:</b> решение принимает методист." });
+  });
+  if (ks.length > 1) {
+    const k = ks.slice().sort((a, b) => s[b].idx - s[a].idx), L = k[0], W = k[1], close = s[L].idx - s[W].idx < 3;
+    const cav = "<br><b>Ограничения:</b> описательное сравнение: влияют состав классов, учитель и сложность теста, оно не доказывает, что разницу вызвал учебник; веса индекса " + WA + "/" + (100 - WA) + " условные. Выбор учебника остаётся за методистом.";
+    out.push(close ? { t: "Сравнение", c: "#fbbf24", h: "Сводный индекс учебников «" + L + "» и «" + W + "» близок",
+      x: "<b>Данные:</b> индекс " + s[L].idx + " и " + s[W].idx + " (разница меньше 3 пунктов, условный порог), выделять один учебник нет оснований." + cav }
+      : { t: "Сравнение", c: "#fbbf24", h: "Наблюдаемый результат выше у «" + L + "» в этой выборке",
+      x: "<b>Данные:</b> сводный индекс " + s[L].idx + " против " + s[W].idx + " у «" + W + "»." + cav });
+    let bi = 0, bd = 0;
+    d.topics.forEach((_, i) => { const df = Math.abs(d.books[L].score[i] - d.books[W].score[i]); if (df > bd) { bd = df; bi = i; } });
+    if (bd >= 8) {
+      const hi = d.books[L].score[bi] > d.books[W].score[bi] ? L : W, lo = hi === L ? W : L;
+      out.push({ t: "Проверить", c: "#38bdf8", h: "Сравнить подачу темы «" + d.topics[bi] + "» в программах «" + hi + "» и «" + lo + "»",
+        x: "<b>Данные:</b> разница " + +bd.toFixed(1) + " п.п. (выше у «" + hi + "»).<br><b>Вариант:</b> сравнить задачи и порядок подачи материала.<br><b>Ограничения:</b> причина неизвестна." });
+    }
+  }
+  return out;
+}
+
+// ===== таблица проблем =====
+function renderTable(d) {
+  const p = problems(d), all = p.length && p.every(r => r.act);
+  $("#thaff").innerHTML = all ? "Учеников ниже порога<small>по данным файла</small>" : (SRC.demo ? "Оценка по демонстрационной модели" : "Оценка по среднему баллу") + "<small>учеников × (100% − результат); не факт" + (p.some(r => r.act) ? "; где указано — по данным файла" : "") + "</small>";
+  $("#pc").textContent = p.length + (p.length === 1 ? " раздел" : " раздела");
+  $("#tb").innerHTML = p.length ? p.map((r, i) => {
+    const s = sev(r.gap);
+    return `<tr class="row" style="animation-delay:${i * 90}ms">
+      <td><span class="inline-flex items-center gap-2"><i class="h-2.5 w-2.5 rounded-full" style="background:${BC[r.book]}"></i>${r.book}</span></td>
+      <td class="max-w-[220px]">${r.topic}</td>
+      <td><div class="flex items-center gap-3"><div class="h-1.5 w-20 overflow-hidden rounded bg-white/10"><i class="block h-full rounded bg-rose-400" style="width:${r.score}%"></i></div><b class="font-medium">${r.score}%</b></div></td>
+      <td class="font-medium text-rose-300">−${r.gap} п.п.</td>
+      <td class="text-zinc-300">${r.act ? "<b class='font-medium text-white'>" + fmt(r.aff) + "</b><small class='block text-[11px] text-emerald-300'>по данным файла</small>" : "≈ " + fmt(r.aff) + "<small class='block text-[11px] text-zinc-400'>оценка</small>"}</td>
+      <td><span class="chip ${s[1]}">${s[0]}</span></td></tr>`;
+  }).join("") : `<tr><td colspan="6" class="py-12 text-center text-zinc-400">Все темы не ниже порога прототипа ${THR}%. По этому признаку перераспределение часов не предлагается.</td></tr>`;
+}
+
+// ===== импорт CSV / XLSX без внешних библиотек =====
+function parseCSV(t) {
+  t = t.replace(/^\uFEFF/, "");
+  const first = t.split(/\r?\n/, 1)[0], dl = [";", "\t", ","].map(c => [c, first.split(c).length]).sort((a, b) => b[1] - a[1])[0][0];
+  const rows = []; let row = [], f = "", q = false;
+  for (let i = 0; i < t.length; i++) {
+    const c = t[i];
+    if (q) { if (c === '"') { if (t[i + 1] === '"') { f += '"'; i++; } else q = false; } else f += c; }
+    else if (c === '"') q = true;
+    else if (c === dl) { row.push(f); f = ""; }
+    else if (c === "\n") { row.push(f); rows.push(row); row = []; f = ""; }
+    else if (c !== "\r") f += c;
+  }
+  if (f !== "" || row.length) { row.push(f); rows.push(row); }
+  return rows.filter(r => r.some(x => x.trim() !== ""));
+}
+const unxml = s => s.replace(/&#(\d+);/g, (_, n) => String.fromCharCode(n)).replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, "&");
+async function inflate(u8) { return new Uint8Array(await new Response(new Blob([u8]).stream().pipeThrough(new DecompressionStream("deflate-raw"))).arrayBuffer()); }
+async function readXlsx(buf) {
+  const u = new Uint8Array(buf), v = new DataView(buf), dec = new TextDecoder();
+  let e = u.length - 22; while (e >= 0 && v.getUint32(e, true) !== 0x06054b50) e--;
+  if (e < 0) throw new Error("файл не похож на .xlsx");
+  const cnt = v.getUint16(e + 10, true), F = {}; let p = v.getUint32(e + 16, true);
+  for (let i = 0; i < cnt; i++) {
+    const m = v.getUint16(p + 10, true), cs = v.getUint32(p + 20, true), nl = v.getUint16(p + 28, true), xl = v.getUint16(p + 30, true), cl = v.getUint16(p + 32, true), off = v.getUint32(p + 42, true);
+    const name = dec.decode(u.subarray(p + 46, p + 46 + nl)); p += 46 + nl + xl + cl;
+    if (!/^xl\/(sharedStrings\.xml|worksheets\/sheet\d+\.xml)$/.test(name)) continue;
+    const ds = off + 30 + v.getUint16(off + 26, true) + v.getUint16(off + 28, true), raw = u.subarray(ds, ds + cs);
+    F[name] = dec.decode(m === 0 ? raw : await inflate(raw));
+  }
+  const sh = Object.keys(F).filter(n => /sheet\d+/.test(n)).sort((a, b) => parseInt(a.match(/\d+/)) - parseInt(b.match(/\d+/)))[0];
+  if (!sh) throw new Error("в файле нет листов");
+  const tx = x => [...x.matchAll(/<t[^>]*>([\s\S]*?)<\/t>/g)].map(m => unxml(m[1])).join("");
+  const ss = F["xl/sharedStrings.xml"] ? [...F["xl/sharedStrings.xml"].matchAll(/<si>([\s\S]*?)<\/si>/g)].map(m => tx(m[1])) : [];
+  const rows = [];
+  for (const rm of F[sh].matchAll(/<row\b[^>]*>([\s\S]*?)<\/row>/g)) {
+    const r = [];
+    for (const c of rm[1].matchAll(/<c\b([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g)) {
+      const at = c[1], ref = (at.match(/\br="([A-Z]+)\d+"/) || [])[1], t = (at.match(/\bt="(\w+)"/) || [])[1], body = c[2] || "", vv = (body.match(/<v>([\s\S]*?)<\/v>/) || [])[1];
+      let ci = 0; for (const ch of ref || "A") ci = ci * 26 + ch.charCodeAt(0) - 64; ci--;
+      r[ci] = t === "s" ? ss[+vv] ?? "" : t === "inlineStr" ? tx(body) : vv === undefined ? "" : unxml(vv);
+    }
+    rows.push(Array.from(r, x => x ?? ""));
+  }
+  return rows.filter(r => r.some(x => String(x).trim() !== ""));
+}
+const ALIAS = { class: ["class", "класс"], subject: ["subject", "предмет"], textbook: ["textbook", "book", "учебник"], topic: ["topic", "тема"], period: ["period", "период"], score: ["score", "балл", "результат"], students: ["students", "учеников", "ученики"], hours: ["hours", "часы", "часов"], below: ["students_below", "below", "ниже_порога"] };
+function buildDB(rows) {
+  const E = [], W = [];
+  if (rows.length < 2) return { E: ["в файле нет строк данных"], W };
+  const H = rows[0].map(x => String(x).trim().toLowerCase().replace(/\s+/g, "_")), col = {};
+  for (const [k, a] of Object.entries(ALIAS)) col[k] = H.findIndex(h => a.includes(h));
+  ["class", "subject", "textbook", "topic", "score", "students", "hours"].forEach(k => { if (col[k] < 0) E.push("нет колонки «" + k + "»"); });
+  if (E.length) return { E, W };
+  const num = x => { const s = String(x ?? "").trim().replace("%", "").replace(",", "."); return s === "" ? NaN : Number(s); };
+  let stripped = false; const cl = s => { const t = String(s).replace(/[<>&"'`|]/g, ""); if (t !== String(s)) stripped = true; return t.trim(); };
+  const G = {}; let n = 0;
+  rows.slice(1).forEach((r, i) => {
+    const g = k => col[k] >= 0 ? String(r[col[k]] ?? "").trim() : "";
+    const c = cl(g("class")), su = cl(g("subject")), bk = cl(g("textbook")), tp = cl(g("topic")), pe = cl(g("period")) || "—";
+    const sc = num(g("score")), st = num(g("students")), hr = num(g("hours")), bl = g("below") === "" ? null : num(g("below")), bad = [];
+    if (!c || !su || !bk || !tp) bad.push("пустые класс/предмет/учебник/тема");
+    if (!(sc >= 0 && sc <= 100)) bad.push("балл вне 0–100");
+    if (!(Number.isInteger(st) && st >= 1)) bad.push("«students» — не целое ≥ 1");
+    if (!(hr >= 0)) bad.push("«hours» — не число ≥ 0");
+    if (bl !== null && !(Number.isInteger(bl) && bl >= 0 && bl <= st)) bad.push("«students_below» — целое от 0 до students");
+    if (bad.length) { E.push("строка " + (i + 2) + ": " + bad.join("; ")); return; }
+    const gr = G[c + "|" + su] ||= { c, su, tops: [], hrs: {}, rec: {} }, bb = gr.rec[bk] ||= {}, pp = bb[pe] ||= {};
+    if (pp[tp]) { E.push("строка " + (i + 2) + ": дубликат (" + [c, su, bk, tp, pe].join(", ") + ")"); return; }
+    if (!gr.tops.includes(tp)) gr.tops.push(tp);
+    if (gr.hrs[tp] !== undefined && gr.hrs[tp] !== hr) W.push("часы темы «" + tp + "» различаются между строками, взято первое значение"); else gr.hrs[tp] = hr;
+    pp[tp] = { sc: Math.round(sc * 10) / 10, st, bl }; n++;
+  });
+  const db = {};
+  for (const [key, gr] of Object.entries(G)) {
+    const bks = Object.keys(gr.rec), ps0 = Object.keys(gr.rec[bks[0]]).sort((a, b) => a.localeCompare(b, "ru", { numeric: true }));
+    let okG = true;
+    for (const bk of bks) {
+      const ps = Object.keys(gr.rec[bk]).sort((a, b) => a.localeCompare(b, "ru", { numeric: true }));
+      if (ps.join("|") !== ps0.join("|")) { E.push(key + ": у учебников «" + bks[0] + "» и «" + bk + "» разные периоды"); okG = false; }
+      for (const pe of ps) if (gr.tops.some(t => !gr.rec[bk][pe][t])) { E.push(key + ", «" + bk + "», период " + pe + ": есть не все темы"); okG = false; }
+    }
+    if (!okG) continue;
+    const d = { topics: gr.tops, hours: gr.tops.map(t => gr.hrs[t]), books: {}, period: ps0[ps0.length - 1] };
+    for (const bk of bks) {
+      const last = gr.tops.map(t => gr.rec[bk][d.period][t]), anyBl = last.some(x => x.bl !== null);
+      d.books[bk] = { score: last.map(x => x.sc), students: Math.max(...last.map(x => x.st)), schools: null, sts: last.map(x => x.st), below: anyBl ? last.map(x => x.bl) : undefined,
+        hist: ps0.map(p => ({ p, score: gr.tops.map(t => gr.rec[bk][p][t].sc) })) };
+      if (!BC[bk]) BC[bk] = PALETTE[Object.keys(BC).length % PALETTE.length];
+    }
+    db[key] = d;
+  }
+  if (stripped) W.push("символы < > & \" ' ` | удалены из текстов");
+  if (!E.length && !Object.keys(db).length) E.push("не найдено ни одной группы класс/предмет");
+  return { E, W, db, n };
+}
+function setSel(c, s) {
+  cls = c; sub = s;
+  [["cls", c], ["sub", s]].forEach(([k, v]) => document.querySelectorAll('.seg[data-k="' + k + '"] button').forEach(b => b.classList.toggle("on", b.dataset.v === v)));
+}
+function useDB(db, name) {
+  DB = db; SRC = { demo: db === DEMO, name };
+  const ks = Object.keys(db).map(x => x.split("|")), cs = [...new Set(ks.map(x => x[0]))].sort((a, b) => a.localeCompare(b, "ru", { numeric: true })), ss = [...new Set(ks.map(x => x[1]))];
+  const fill = (k, vals, lb) => { $('.seg[data-k="' + k + '"]').innerHTML = vals.map(v => '<button data-v="' + v + '">' + lb(v) + "</button>").join(""); };
+  fill("cls", cs, v => v + " класс"); fill("sub", ss, v => v);
+  setSel(ks[0][0], ks[0][1]);
+  update();
+}
+async function doImport(f) {
+  const msg = $("#imsg"), say = (t, ok) => { msg.textContent = t; msg.className = "mt-2 text-[13px] " + (ok ? "text-emerald-300" : "text-rose-300"); };
+  try {
+    if (f.size > 2e6) return say("Файл не принят: больше 2 МБ.", false);
+    const buf = await f.arrayBuffer(); let rows;
+    if (/\.xlsx$/i.test(f.name)) {
+      if (typeof DecompressionStream === "undefined") return say("Браузер не умеет читать .xlsx — сохраните файл как CSV.", false);
+      rows = await readXlsx(buf);
+    } else if (/\.(csv|txt)$/i.test(f.name)) {
+      let t; try { t = new TextDecoder("utf-8", { fatal: true }).decode(buf); } catch { t = new TextDecoder("windows-1251").decode(buf); }
+      rows = parseCSV(t);
+    } else return say("Файл не принят: поддерживаются .csv и .xlsx.", false);
+    if (rows.length > 5001) return say("Файл не принят: больше 5000 строк данных.", false);
+    const r = buildDB(rows);
+    if (r.E.length) return say("Файл не принят. " + r.E.slice(0, 6).join(" · ") + (r.E.length > 6 ? " · …ещё " + (r.E.length - 6) : ""), false);
+    useDB(r.db, f.name);
+    say("Принято строк: " + r.n + ", групп класс/предмет: " + Object.keys(r.db).length + ". Проверены формат и диапазоны, достоверность данных не проверяется." + (r.W.length ? " Предупреждения: " + [...new Set(r.W)].slice(0, 3).join(" · ") : ""), true);
+  } catch (e) { say("Не удалось прочитать файл: " + e.message, false); }
+}
+function csvTemplate() {
+  const L = ["class;subject;textbook;topic;period;score;students;hours;students_below"];
+  for (const [key, d] of Object.entries(DEMO)) for (const [bk, b] of Object.entries(d.books)) d.topics.forEach((t, i) => L.push(key.replace("|", ";") + ";" + bk + ";" + t + ";2026-Q1;" + b.score[i] + ";" + b.students + ";" + d.hours[i] + ";"));
+  return "\uFEFF" + L.join("\r\n");
+}
+
+// ===== интерфейс =====
+function readCfg() {
+  const g = id => parseInt($("#" + id).value, 10), c = (v, a, b, f) => Number.isFinite(v) ? Math.min(b, Math.max(a, v)) : f;
+  THR = c(g("c-thr"), 30, 95, THR); WA = c(g("c-wa"), 0, 100, WA); MINP = c(g("c-min"), 30, 100, MINP); MAXP = c(g("c-max"), 100, 300, MAXP); MARGIN = c(g("c-mar"), 0, 30, MARGIN);
+  [["c-thr", THR], ["c-wa", WA], ["c-ws", 100 - WA], ["c-min", MINP], ["c-max", MAXP], ["c-mar", MARGIN]].forEach(([i, v]) => { $("#" + i).value = v; });
+}
+function syncUI(d) {
+  document.querySelectorAll("[data-thr]").forEach(e => { e.textContent = THR; });
+  document.querySelectorAll("[data-wa]").forEach(e => { e.textContent = WA; });
+  document.querySelectorAll("[data-ws]").forEach(e => { e.textContent = 100 - WA; });
+  $("#dstate").textContent = SRC.demo ? "Демонстрационные данные" : "Данные из файла: " + SRC.name;
+  $("#dstate").className = "chip " + (SRC.demo ? "c-y" : "border-emerald-300/30 text-emerald-300");
+  const dc = $("#demoChip"); if (dc) dc.hidden = !SRC.demo;
+  const dn = $("#demoNote"); if (dn) dn.hidden = !SRC.demo;
+  $("#per").innerHTML = SRC.demo ? PER0 : "Период: " + esc(d.period);
+  $("#meth").innerHTML = method();
+  const P = Object.keys(d.books).map(k => plan(d, k));
+  $("#hrs").innerHTML = hoursTable(d); $("#hnote").textContent = hoursNote();
+  $("#hchk").textContent = P.every(p => p.ok) ? "Итого часов " + sum(d.hours) + " → " + sum(d.hours) + " ✓ сохранено" : "⚠ нарушено ограничение";
+  $("#trs").innerHTML = trendHTML(d); drawTrend(d);
+}
+function update() {
+  const d = cur();
+  $("#ctx").textContent = sub + ", " + cls + " класс · " + (SRC.demo ? "Казахстан · демонстрационная выборка" : "данные из файла «" + SRC.name + "»");
+  renderMetrics(d); draw(); renderTable(d); renderAI(d); syncUI(d);
+}
+
+// ===== экспорт отчёта (те же функции, что и в интерфейсе) =====
+function report() {
+  const d = cur(), ks = Object.keys(d.books), p = problems(d);
+  const rows = d.topics.map((t, i) => "<tr><td>" + t + "</td>" + ks.map(k => "<td>" + d.books[k].score[i] + "%</td>").join("") + "<td>" + d.hours[i] + "</td></tr>").join("");
+  const pl = p.length ? p.map(r => "<li>" + r.book + ": «" + r.topic + "», " + r.score + "% (отставание " + r.gap + " п.п., " + sev(r.gap)[0].toLowerCase() + "; " + (r.act ? r.aff + " учеников — по данным файла" : "≈ " + r.aff + " учеников — оценка, не факт") + ")</li>").join("") : "<li>Тем ниже порога нет</li>";
+  const rl = recs(d).map(r => "<li><b>" + r.h + ".</b><br>" + r.x + "</li>").join("");
+  const warn = SRC.demo ? "<b>Демонстрационные данные.</b> Числа учеников, количество школ и результаты тестов в прототипе условные и не являются подтверждённой статистикой. Названия учебников использованы как метки для демонстрации: приведённые результаты не отражают реальные результаты школ или учебников. Отчёт не является официальным документом."
+    : "<b>Данные загружены пользователем из файла «" + esc(SRC.name) + "».</b> Платформа проверила только формат и диапазоны значений, достоверность и репрезентативность не подтверждаются. Отчёт не является официальным документом.";
+  return `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"><title>${SRC.demo ? "Демонстрационный отчёт" : "Отчёт"}</title><style>body{font-family:Arial,sans-serif;max-width:860px;margin:40px auto;color:#111;line-height:1.5}table{border-collapse:collapse;width:100%}td,th{border:1px solid #ccc;padding:8px;text-align:left}th{background:#f1f1f5}.warn{border:2px solid #d97706;background:#fffbeb;padding:12px 16px;border-radius:6px;margin:16px 0}.dec{border-top:1px solid #ccc;margin-top:28px;padding-top:12px;font-weight:bold}</style></head><body>
+<h1>${SRC.demo ? "Демонстрационный отчёт" : "Отчёт"} Data-Driven Curriculum</h1>
+<div class="warn"><p>${warn}</p></div>
+<p>${sub}, ${cls} класс. Дата формирования: ${new Date().toLocaleDateString("ru-RU")}.</p>
+<p>Параметры: порог освоения ${THR}% (настройка, не официальный норматив); веса индекса ${WA}% / ${100 - WA}%; пределы часов на тему ${MINP}–${MAXP}% исходных; запас донора ${MARGIN} п.п.</p>
+<h2>Результаты по темам</h2><table><tr><th>Тема</th>${ks.map(k => "<th>" + k + "</th>").join("")}<th>Часов по плану</th></tr>${rows}</table>
+<h2>Проблемные разделы</h2><ul>${pl}</ul>
+<h2>Перераспределение часов: исходный план и вариант</h2>${hoursTable(d)}<p>${hoursNote()}</p>
+<h2>Динамика по периодам</h2>${trendHTML(d)}
+<h2>Автоматические подсказки</h2><p>Рассчитаны по заданным правилам, не языковой моделью. Это варианты для рассмотрения, а не решения.</p><ul>${rl}</ul>
+<h2>Методика и ограничения</h2><ul>${method()}</ul>
+<p class="dec">Окончательное решение по часам и выбору учебника принимает методист.</p></body></html>`;
+}
+$("#exp").addEventListener("click", () => {
+  const b = $("#exp"), sp = b.querySelector("span"), old = sp.textContent;
+  b.classList.add("busy"); sp.textContent = "Формирование отчета...";
+  setTimeout(() => {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([report()], { type: "text/html;charset=utf-8" }));
+    a.download = (SRC.demo ? "demo_report_" : "report_") + cls + "_" + (sub === "Алгебра" ? "algebra" : sub === "Геометрия" ? "geometry" : "subject") + ".html";
+    a.click();
+    b.classList.remove("busy"); sp.textContent = old;
+    toast("Отчет сохранен: " + a.download);
+  }, 1300);
+});
+document.querySelectorAll(".seg").forEach(g => g.addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  const k = g.dataset.k;
+  g.querySelectorAll("button").forEach(x => x.classList.remove("on")); b.classList.add("on");
+  if (k === "mode") { mode = b.dataset.v; draw(); return; }
+  if (k === "cls") cls = b.dataset.v; else sub = b.dataset.v;
+  if (!DB[cls + "|" + sub]) { const m = Object.keys(DB).find(x => k === "cls" ? x.startsWith(cls + "|") : x.endsWith("|" + sub)).split("|"); setSel(m[0], m[1]); }
+  update();
+}));
+$("#re").addEventListener("click", () => renderAI(cur()));
+["c-thr", "c-wa", "c-min", "c-max", "c-mar"].forEach(i => $("#" + i).addEventListener("change", () => { readCfg(); update(); }));
+$("#c-rst").addEventListener("click", () => { $("#c-thr").value = CFG0.thr; $("#c-wa").value = CFG0.wa; $("#c-min").value = CFG0.minp; $("#c-max").value = CFG0.maxp; $("#c-mar").value = CFG0.margin; readCfg(); update(); });
+$("#imp").addEventListener("change", e => { const f = e.target.files[0]; if (f) doImport(f); e.target.value = ""; });
+$("#demo-back").addEventListener("click", () => { useDB(DEMO, ""); $("#imsg").textContent = "Возвращены демонстрационные данные."; $("#imsg").className = "mt-2 text-[13px] text-zinc-400"; });
+$("#tpl").addEventListener("click", () => { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csvTemplate()], { type: "text/csv;charset=utf-8" })); a.download = "template_demo.csv"; a.click(); });
+document.querySelectorAll(".card").forEach(c => c.addEventListener("pointermove", e => {
+  const r = c.getBoundingClientRect();
+  c.style.setProperty("--x", e.clientX - r.left + "px");
+  c.style.setProperty("--y", e.clientY - r.top + "px");
+}));
+const PER0 = $("#per").innerHTML;
+readCfg();
+update();
+</script>
+</body>
+</html>
